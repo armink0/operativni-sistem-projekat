@@ -1,32 +1,43 @@
 package application;
 
+import java.util.List;
 
 public class File {
-	private String name;
-    private int size;
+    private String name;
+    private int sizeInMB;
+    private List<Block> allocatedBlocks;
 
-    public File(String name, int size) {
+    public File(String name, int sizeInMB) {
         this.name = name;
-        this.size = size;
+        this.sizeInMB = sizeInMB;
+        this.allocatedBlocks = null; // Initialize allocated blocks as null
     }
 
     public String getName() {
-		return name;
-	}
+        return name;
+    }
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	public int getSize() {
-		return size;
-	}
+    public int getSizeInMB() {
+        return sizeInMB;
+    }
 
-	public void setSize(int size) {
-		this.size = size;
-	}
+    public void setSizeInMB(int sizeInMB) {
+        this.sizeInMB = sizeInMB;
+    }
 
-	@Override
+    public List<Block> getAllocatedBlocks() {
+        return allocatedBlocks;
+    }
+
+    public void setAllocatedBlocks(List<Block> allocatedBlocks) {
+        this.allocatedBlocks = allocatedBlocks;
+    }
+
+    @Override
     public String toString() {
         return name;
     }

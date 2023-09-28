@@ -1,6 +1,5 @@
 package application;
 
-import application.Directory;
 
 public class FileSystem {
 	private Directory root;
@@ -14,4 +13,3 @@ public class FileSystem {
     }
 
 }
-
