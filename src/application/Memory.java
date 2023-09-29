@@ -18,28 +18,24 @@ public class Memory {
 		int totalAvailableMemory = memorySegments.size() * memorySegments.get(0).getSize();
 		if (memorySize > totalAvailableMemory) {
 			System.out.println("Requested memory size exceeds total available memory. Allocation failed.");
-			return new ArrayList<>(); // Return an empty list to indicate allocation failure
+			return new ArrayList<>();
 		}
 
-		// Check if there are enough free memory segments
 		List<MemorySegment> allocatedSegments = new ArrayList<>();
 		int remainingMemorySize = memorySize;
-		boolean allSegmentsOccupied = true;
 
 		for (MemorySegment segment : memorySegments) {
 			if (segment.getProcess() == null) {
-				allSegmentsOccupied = false; // At least one segment is available
 				int segmentSize = segment.getSize();
 				if (segmentSize >= remainingMemorySize) {
-					// Allocate the entire segment
 					segment.setProcess(process);
 					allocatedSegments.add(segment);
 					remainingMemorySize -= segmentSize;
+
 					if (remainingMemorySize <= 0) {
 						break;
 					}
 				} else {
-					// Allocate a part of the segment
 					segment.setProcess(process);
 					allocatedSegments.add(segment);
 					remainingMemorySize -= segmentSize;
@@ -52,12 +48,6 @@ public class Memory {
 			}
 		}
 
-		// If all segments are occupied, print a message
-		if (allSegmentsOccupied) {
-			System.out.println("Not enough available memory segments to allocate for the process.");
-		}
-
-		// If there's not enough memory, deallocate the allocated segments
 		if (remainingMemorySize > 0 && allocatedSegments.size() < memorySegments.size()) {
 			for (MemorySegment segment : allocatedSegments) {
 				segment.setProcess(null);
@@ -68,7 +58,6 @@ public class Memory {
 		return allocatedSegments;
 	}
 
-	// Deallocate memory segments associated with processes in "DONE" state
 	public void deallocateDoneProcesses() {
 		for (MemorySegment segment : memorySegments) {
 			Process process = segment.getProcess();
@@ -78,7 +67,6 @@ public class Memory {
 		}
 	}
 
-	// Get the number of available memory segments
 	public int getNumAvailableSegments() {
 		int numAvailableSegments = 0;
 		for (MemorySegment segment : memorySegments) {
@@ -89,12 +77,10 @@ public class Memory {
 		return numAvailableSegments;
 	}
 
-	// Get the list of memory segments
 	public List<MemorySegment> getMemorySegments() {
 		return memorySegments;
 	}
 
-	// Represents a memory segment allocated to a process
 	public static class MemorySegment {
 		private Process process;
 		private int size;

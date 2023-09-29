@@ -39,6 +39,7 @@ public class Process {
 
 	public void execute(int time) {
 		executionTime -= time;
+		
 		if (executionTime <= 0) {
 			state = State.DONE;
 		} else {

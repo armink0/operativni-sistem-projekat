@@ -19,7 +19,6 @@ public class Main extends Application {
 	private static final int TOTAL_DISK_MEMORY_BLOCKS = 256;
 	private static final int blockSizeInMB = 4;
 
-	// Create an initial set of memory segments, split evenly
 	private static int totalMemory = 2048;
 	private static int numSegments = 4;
 	private static List<Memory.MemorySegment> initialSegments = new ArrayList<>();
@@ -38,7 +37,6 @@ public class Main extends Application {
 			initialSegments.add(segment);
 		}
 
-		// Create a Memory object with the initial memory segments
 		memory = new Memory(initialSegments);
 
 		createMemoryBlocks();
@@ -167,7 +165,7 @@ public class Main extends Application {
 						for (File f : currentDirectory.getFiles()) {
 							if (userInput.split(" ")[1].equals(f.toString())) {
 								currentDirectory.deleteFile(f.getName());
-								// Deallocate memory when a file is deleted
+
 								deallocateMemoryBlocks(f.getAllocatedBlocks());
 								textarea.appendText("File deleted and memory deallocated.\n");
 								break;
@@ -189,18 +187,27 @@ public class Main extends Application {
 						String processName = userInput.split(" ")[1];
 						int memorySize = Integer.parseInt(userInput.split(" ")[2]);
 
-						if (memory.getNumAvailableSegments() > 0) {
+						boolean processExists = false;
+						for (Memory.MemorySegment segment : memory.getMemorySegments()) {
+							Process existingProcess = segment.getProcess();
+							if (existingProcess != null && existingProcess.getName().equals(processName)) {
+								processExists = true;
+								System.out.println(
+										"A process with name " + processName + " is already in memory. Ignored.");
+								break;
+							}
+						}
+
+						if (memory.getNumAvailableSegments() > 0 && !processExists) {
 							Process p = new Process(processName, 10, memorySize);
 
 							List<Memory.MemorySegment> allocatedSegments = memory.allocateMemory(p, memorySize);
 
-							// Set the process for each allocated memory segment
 							for (Memory.MemorySegment segment : allocatedSegments) {
 								segment.setProcess(p);
 							}
 
 							if (allocatedSegments.size() > 0) {
-								// Add the process to the scheduler
 								scheduler.addProcess(p);
 
 								textarea.appendText("process " + p.getName() + ", " + p.getState() + ", time: "
@@ -214,6 +221,7 @@ public class Main extends Application {
 
 						System.out.println("Memory allocation status:");
 						List<Memory.MemorySegment> memorySegments = memory.getMemorySegments();
+
 						for (Memory.MemorySegment segment : memorySegments) {
 							Process process = segment.getProcess();
 							processName = (process != null) ? process.getName() : "Unallocated";
@@ -263,7 +271,6 @@ public class Main extends Application {
 		List<Block> allocatedBlocks = new ArrayList<>();
 		int blocksRequired = (int) Math.ceil((double) fileSizeInMB / blockSizeInMB);
 
-		// Check for available contiguous memory blocks
 		int contiguousCount = 0;
 
 		for (Block block : diskMemoryBlocks) {
@@ -272,24 +279,23 @@ public class Main extends Application {
 				allocatedBlocks.add(block);
 
 				if (contiguousCount == blocksRequired) {
-					// Found enough contiguous blocks; mark them as allocated
 					for (Block allocatedBlock : allocatedBlocks) {
 						allocatedBlock.allocate();
 					}
+
 					return allocatedBlocks;
 				}
 			} else {
-				contiguousCount = 0; // Reset if allocated block encountered
+				contiguousCount = 0;
 				allocatedBlocks.clear();
 			}
 		}
 
-		// Deallocate blocks if allocation failed
 		for (Block block : allocatedBlocks) {
 			block.deallocate();
 		}
 
-		return null; // Not enough contiguous memory blocks
+		return null;
 	}
 
 	private int getAvailableMemorySize() {
@@ -304,7 +310,7 @@ public class Main extends Application {
 
 	private void deallocateMemoryBlocks(List<Block> blocksToDeallocate) {
 		for (Block block : blocksToDeallocate) {
-			block.deallocate(); // Mark the block as deallocated
+			block.deallocate();
 		}
 	}
 
