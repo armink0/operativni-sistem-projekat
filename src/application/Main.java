@@ -15,16 +15,32 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 public class Main extends Application {
-	private static List<Block> memoryBlocks = new ArrayList<>();
-	private static final int TOTAL_MEMORY_BLOCKS = 256;
+	private static List<Block> diskMemoryBlocks = new ArrayList<>();
+	private static final int TOTAL_DISK_MEMORY_BLOCKS = 256;
 	private static final int blockSizeInMB = 4;
+
+	// Create an initial set of memory segments, split evenly
+	private static int totalMemory = 2048;
+	private static int numSegments = 4;
+	private static List<Memory.MemorySegment> initialSegments = new ArrayList<>();
 
 	FileSystem fileSystem = new FileSystem();
 	Directory root = fileSystem.getRoot();
 	Directory currentDirectory = fileSystem.getRoot();
 	FCFSScheduler scheduler = new FCFSScheduler();
+	static Memory memory = null;
 
 	public static void main(String[] args) {
+		int initialSegmentSize = totalMemory / numSegments;
+
+		for (int i = 0; i < numSegments; i++) {
+			Memory.MemorySegment segment = new Memory.MemorySegment(null, initialSegmentSize);
+			initialSegments.add(segment);
+		}
+
+		// Create a Memory object with the initial memory segments
+		memory = new Memory(initialSegments);
+
 		createMemoryBlocks();
 		launch(args);
 	}
@@ -78,6 +94,7 @@ public class Main extends Application {
 
 			enter.setOnAction(e -> {
 				String userInput = textField.getText();
+				memory.deallocateDoneProcesses();
 
 				if (userInput.equals("..")) {
 					if (currentDirectory.getParent() != null) {
@@ -112,7 +129,7 @@ public class Main extends Application {
 
 						int numBlocksNeeded = (int) Math.ceil((double) fileSizeInMB / blockSizeInMB);
 
-						if (numBlocksNeeded <= memoryBlocks.size()) {
+						if (numBlocksNeeded <= diskMemoryBlocks.size()) {
 							List<Block> allocatedBlocks = allocateMemoryBlocks(fileSizeInMB);
 
 							if (allocatedBlocks != null) {
@@ -132,7 +149,7 @@ public class Main extends Application {
 
 					} else if (userInput.equals("df")) {
 						int availableBlocks = 0;
-						for (Block b : memoryBlocks) {
+						for (Block b : diskMemoryBlocks) {
 							if (!b.isAllocated())
 								availableBlocks++;
 						}
@@ -170,13 +187,39 @@ public class Main extends Application {
 						textarea.appendText("-----------\n");
 					} else if (userInput.split(" ")[0].equals("run")) {
 						String processName = userInput.split(" ")[1];
+						int memorySize = Integer.parseInt(userInput.split(" ")[2]);
 
-						Process p = new Process(processName, 5, 15);
+						if (memory.getNumAvailableSegments() > 0) {
+							Process p = new Process(processName, 10, memorySize);
 
-						scheduler.addProcess(p);
+							List<Memory.MemorySegment> allocatedSegments = memory.allocateMemory(p, memorySize);
 
-						textarea.appendText("process " + p.getName() + ", " + p.getState() + ", time: "
-								+ p.getExecutionTime() + "\n");
+							// Set the process for each allocated memory segment
+							for (Memory.MemorySegment segment : allocatedSegments) {
+								segment.setProcess(p);
+							}
+
+							if (allocatedSegments.size() > 0) {
+								// Add the process to the scheduler
+								scheduler.addProcess(p);
+
+								textarea.appendText("process " + p.getName() + ", " + p.getState() + ", time: "
+										+ p.getExecutionTime() + "\n");
+							} else {
+								textarea.appendText("Not enough memory for process.\n");
+							}
+						} else {
+							System.out.println("Not enough available memory segments to allocate for the process.");
+						}
+
+						System.out.println("Memory allocation status:");
+						List<Memory.MemorySegment> memorySegments = memory.getMemorySegments();
+						for (Memory.MemorySegment segment : memorySegments) {
+							Process process = segment.getProcess();
+							processName = (process != null) ? process.getName() : "Unallocated";
+							System.out
+									.println("Memory Segment Size: " + segment.getSize() + " Process: " + processName);
+						}
 					} else if (userInput.equals("ps")) {
 						List<Process> processesInQueue = scheduler.getProcessesInQueue();
 
@@ -198,15 +241,17 @@ public class Main extends Application {
 							textarea.appendText("Process " + process.getName() + " in state: " + process.getState()
 									+ ", " + process.getExecutionTime() + "\n");
 						}
-					} else {
+					} else if (!userInput.equals("")) {
 						textarea.appendText("Unknown command.\n");
 					}
 				}
 
-				textarea.appendText("Current Directory: " + currentDirectory + "\n");
-				textarea.appendText("Enter command, '..' to go back:\n");
-				textField.clear();
-				textField.requestFocus();
+				if (!userInput.equals("")) {
+					textarea.appendText("Current Directory: " + currentDirectory + "\n");
+					textarea.appendText("Enter command, '..' to go back:\n");
+					textField.clear();
+					textField.requestFocus();
+				}
 			});
 
 		} catch (Exception e) {
@@ -221,7 +266,7 @@ public class Main extends Application {
 		// Check for available contiguous memory blocks
 		int contiguousCount = 0;
 
-		for (Block block : memoryBlocks) {
+		for (Block block : diskMemoryBlocks) {
 			if (!block.isAllocated()) {
 				contiguousCount++;
 				allocatedBlocks.add(block);
@@ -249,7 +294,7 @@ public class Main extends Application {
 
 	private int getAvailableMemorySize() {
 		int availableMemory = 0;
-		for (Block block : memoryBlocks) {
+		for (Block block : diskMemoryBlocks) {
 			if (!block.isAllocated()) {
 				availableMemory += blockSizeInMB;
 			}
@@ -264,8 +309,8 @@ public class Main extends Application {
 	}
 
 	private static void createMemoryBlocks() {
-		for (int i = 0; i < TOTAL_MEMORY_BLOCKS; i++) {
-			memoryBlocks.add(new Block(blockSizeInMB));
+		for (int i = 0; i < TOTAL_DISK_MEMORY_BLOCKS; i++) {
+			diskMemoryBlocks.add(new Block(blockSizeInMB));
 		}
 	}
 }
