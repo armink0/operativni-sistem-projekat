@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.stage.Stage;
 import javafx.scene.Scene;
@@ -18,6 +19,9 @@ public class Main extends Application {
 	private static int totalMemory = 2048;
 	private static int numSegments = 4;
 	private static List<Memory.MemorySegment> initialSegments = new ArrayList<>();
+
+	List<String> commandHistory = new ArrayList<>();
+	int currentCommandIndex = -1;
 
 	FileSystem fileSystem = new FileSystem();
 	Directory root = fileSystem.getRoot();
@@ -82,7 +86,31 @@ public class Main extends Application {
 
 			textField.setOnKeyPressed(event -> {
 				if (event.getCode() == KeyCode.ENTER) {
+					String command = textField.getText();
+					commandHistory.add(command);
+					currentCommandIndex = -1;
+
 					enter.fire();
+					event.consume();
+				} else if (event.getCode() == KeyCode.UP) {
+					if (currentCommandIndex < commandHistory.size() - 1) {
+						currentCommandIndex++;
+						textField.setText(commandHistory.get(commandHistory.size() - 1 - currentCommandIndex));
+						positionCaret(textField, textField.getText().length());
+					}
+
+					event.consume();
+				} else if (event.getCode() == KeyCode.DOWN) {
+					if (currentCommandIndex >= 0) {
+						currentCommandIndex--;
+						if (currentCommandIndex >= 0) {
+							textField.setText(commandHistory.get(commandHistory.size() - 1 - currentCommandIndex));
+						} else {
+							textField.clear();
+						}
+						positionCaret(textField, textField.getText().length());
+					}
+
 					event.consume();
 				}
 			});
@@ -95,15 +123,18 @@ public class Main extends Application {
 					if (currentDirectory.getParent() != null) {
 						currentDirectory = currentDirectory.getParent();
 					} else {
+						textarea.appendText("-----------\n");
 						textarea.appendText("Already in root directory.\n-------------\n");
 					}
 				} else {
 					if (userInput.split(" ")[0].equals("mkdir")) {
-						// Checking for the same name
 						int flag = 0;
+						textarea.appendText("-----------\n");
 						for (Directory d : currentDirectory.getSubdirectories()) {
 							if (userInput.split(" ")[1].equals(d.toString())) {
+
 								textarea.appendText("Existing folder.\n");
+
 								flag = 1;
 								break;
 							}
@@ -112,8 +143,11 @@ public class Main extends Application {
 						if (flag == 0) {
 							Directory d = currentDirectory.createDirectory(userInput.split(" ")[1]);
 							Directory d1 = currentDirectory.getSubdirectories().get(0);
+
 							textarea.appendText("New directory created.\n");
 						}
+
+						textarea.appendText("-----------\n");
 					} else if (userInput.split(" ")[0].equals("cd")) {
 						currentDirectory = currentDirectory.changeToSubdirectory(userInput.split(" ")[1]);
 					} else if (userInput.equals("exit")) {
@@ -123,7 +157,12 @@ public class Main extends Application {
 							String fileName = userInput.split(" ")[1];
 
 							if (!fileName.contains(".")) {
+								textarea.appendText("-----------\n");
 								textarea.appendText("File extension not defined properly.\n");
+								textarea.appendText("-----------\n");
+								textarea.appendText("Current Directory: " + currentDirectory + "\n");
+								textarea.appendText("Enter command, '..' to go back:\n");
+
 								return;
 							}
 
@@ -136,35 +175,48 @@ public class Main extends Application {
 
 								if (allocatedBlocks != null) {
 									currentDirectory.createFile(fileName, fileSizeInMB, allocatedBlocks);
+
+									textarea.appendText("-----------\n");
 									textarea.appendText("File created and memory allocated.\n");
+									textarea.appendText("-----------\n");
+
 									System.out.println("File name: " + fileName + ", file size: " + fileSizeInMB
 											+ " MB, allocated blocks: " + allocatedBlocks.size());
 
 								} else {
+									textarea.appendText("-----------\n");
 									textarea.appendText("Not enough memory to allocate the file.\n");
+									textarea.appendText("-----------\n");
 								}
 							} else {
 								System.out.println("Memory space for file not defined");
 							}
-
 						} else {
+							textarea.appendText("-----------\n");
 							textarea.appendText("Not enough memory to allocate the file.\n");
+							textarea.appendText("-----------\n");
 						}
 					} else if (userInput.equals("cd ..")) {
 						currentDirectory = currentDirectory.getParent();
 
 					} else if (userInput.equals("df")) {
 						int availableBlocks = 0;
+
 						for (Block b : Disc.discMemoryBlocks) {
 							if (!b.isAllocated())
 								availableBlocks++;
 						}
+
+						textarea.appendText("-----------\n");
 						textarea.appendText("Memory available: " + availableBlocks * Disc.blockSizeInMB + " MB\n");
+						textarea.appendText("-----------\n");
 
 					} else if (userInput.split(" ")[0].equals("rm")) {
+						textarea.appendText("-----------\n");
 						for (Directory d : currentDirectory.getSubdirectories()) {
 							if (userInput.split(" ")[1].equals(d.toString())) {
 								currentDirectory.deleteDirectory(d.getName());
+
 								textarea.appendText("Directory deleted.\n");
 								break;
 							}
@@ -175,10 +227,13 @@ public class Main extends Application {
 								currentDirectory.deleteFile(f.getName());
 
 								disc.deallocateMemoryBlocks(f.getAllocatedBlocks());
+
 								textarea.appendText("File deleted and memory deallocated.\n");
 								break;
 							}
 						}
+
+						textarea.appendText("-----------\n");
 					} else if (userInput.split(" ")[0].equals("dir") || userInput.split(" ")[0].equals("ls")) {
 						textarea.appendText("-----------\n");
 
@@ -194,6 +249,7 @@ public class Main extends Application {
 						for (File file : currentDirectory.getFiles()) {
 							textarea.appendText(file.getName() + "\n");
 						}
+
 						textarea.appendText("-----------\n");
 					} else if (userInput.split(" ")[0].equals("run")) {
 						String processName = userInput.split(" ")[1];
@@ -224,7 +280,7 @@ public class Main extends Application {
 							if (allocatedSegments.size() > 0) {
 								scheduler.addProcess(p);
 
-								textarea.appendText("process " + p.getName() + ", " + p.getState() + ", time: "
+								textarea.appendText("Process " + p.getName() + ", " + p.getState() + ", time: "
 										+ p.getExecutionTime() + "s\n");
 							} else {
 								textarea.appendText("Not enough memory for process.\n");
@@ -270,10 +326,10 @@ public class Main extends Application {
 
 						textarea.appendText("-----------\n");
 					} else if (!userInput.equals("")) {
+						textarea.appendText("-----------\n");
 						textarea.appendText("Unknown command.\n");
+						textarea.appendText("-----------\n");
 					}
-
-					textarea.appendText("-----------\n");
 				}
 
 				if (!userInput.equals("")) {
@@ -287,5 +343,11 @@ public class Main extends Application {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void positionCaret(TextField textField, int position) {
+		Platform.runLater(() -> {
+			textField.positionCaret(position);
+		});
 	}
 }

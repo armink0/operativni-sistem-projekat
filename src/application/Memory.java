@@ -27,6 +27,7 @@ public class Memory {
 		for (MemorySegment segment : memorySegments) {
 			if (segment.getProcess() == null) {
 				int segmentSize = segment.getSize();
+
 				if (segmentSize >= remainingMemorySize) {
 					segment.setProcess(process);
 					allocatedSegments.add(segment);
@@ -42,7 +43,6 @@ public class Memory {
 				}
 			}
 
-			// If all memory is allocated, break the loop
 			if (allocatedSegments.size() == memorySegments.size()) {
 				break;
 			}
@@ -52,6 +52,7 @@ public class Memory {
 			for (MemorySegment segment : allocatedSegments) {
 				segment.setProcess(null);
 			}
+
 			allocatedSegments.clear();
 		}
 
