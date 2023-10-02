@@ -15,10 +15,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 public class Main extends Application {
-	private static List<Block> diskMemoryBlocks = new ArrayList<>();
-	private static final int TOTAL_DISK_MEMORY_BLOCKS = 256;
-	private static final int blockSizeInMB = 4;
-
 	private static int totalMemory = 2048;
 	private static int numSegments = 4;
 	private static List<Memory.MemorySegment> initialSegments = new ArrayList<>();
@@ -27,6 +23,7 @@ public class Main extends Application {
 	Directory root = fileSystem.getRoot();
 	Directory currentDirectory = fileSystem.getRoot();
 	FCFSScheduler scheduler = new FCFSScheduler();
+	static Disc disc = new Disc();
 	static Memory memory = null;
 
 	public static void main(String[] args) {
@@ -38,8 +35,8 @@ public class Main extends Application {
 		}
 
 		memory = new Memory(initialSegments);
+		Disc.createMemoryBlocks();
 
-		createMemoryBlocks();
 		launch(args);
 	}
 
@@ -122,23 +119,34 @@ public class Main extends Application {
 					} else if (userInput.equals("exit")) {
 						primaryStage.close();
 					} else if (userInput.split(" ")[0].equals("touch")) {
-						String fileName = userInput.split(" ")[1];
-						int fileSizeInMB = Integer.parseInt(userInput.split(" ")[2]);
+						if (userInput.split(" ").length == 3) {
+							String fileName = userInput.split(" ")[1];
 
-						int numBlocksNeeded = (int) Math.ceil((double) fileSizeInMB / blockSizeInMB);
-
-						if (numBlocksNeeded <= diskMemoryBlocks.size()) {
-							List<Block> allocatedBlocks = allocateMemoryBlocks(fileSizeInMB);
-
-							if (allocatedBlocks != null) {
-								currentDirectory.createFile(fileName, fileSizeInMB, allocatedBlocks);
-								textarea.appendText("File created and memory allocated.\n");
-								System.out.println("File name: " + fileName + ", file size: " + fileSizeInMB
-										+ " MB, allocated blocks: " + allocatedBlocks.size());
-
-							} else {
-								textarea.appendText("Not enough memory to allocate the file.\n");
+							if (!fileName.contains(".")) {
+								textarea.appendText("File extension not defined properly.\n");
+								return;
 							}
+
+							int fileSizeInMB = Integer.parseInt(userInput.split(" ")[2]);
+
+							int numBlocksNeeded = (int) Math.ceil((double) fileSizeInMB / Disc.blockSizeInMB);
+
+							if (numBlocksNeeded <= Disc.discMemoryBlocks.size()) {
+								List<Block> allocatedBlocks = disc.allocateMemoryBlocks(fileSizeInMB);
+
+								if (allocatedBlocks != null) {
+									currentDirectory.createFile(fileName, fileSizeInMB, allocatedBlocks);
+									textarea.appendText("File created and memory allocated.\n");
+									System.out.println("File name: " + fileName + ", file size: " + fileSizeInMB
+											+ " MB, allocated blocks: " + allocatedBlocks.size());
+
+								} else {
+									textarea.appendText("Not enough memory to allocate the file.\n");
+								}
+							} else {
+								System.out.println("Memory space for file not defined");
+							}
+
 						} else {
 							textarea.appendText("Not enough memory to allocate the file.\n");
 						}
@@ -147,11 +155,11 @@ public class Main extends Application {
 
 					} else if (userInput.equals("df")) {
 						int availableBlocks = 0;
-						for (Block b : diskMemoryBlocks) {
+						for (Block b : Disc.discMemoryBlocks) {
 							if (!b.isAllocated())
 								availableBlocks++;
 						}
-						textarea.appendText("Memory available: " + availableBlocks * blockSizeInMB + " MB\n");
+						textarea.appendText("Memory available: " + availableBlocks * Disc.blockSizeInMB + " MB\n");
 
 					} else if (userInput.split(" ")[0].equals("rm")) {
 						for (Directory d : currentDirectory.getSubdirectories()) {
@@ -166,19 +174,23 @@ public class Main extends Application {
 							if (userInput.split(" ")[1].equals(f.toString())) {
 								currentDirectory.deleteFile(f.getName());
 
-								deallocateMemoryBlocks(f.getAllocatedBlocks());
+								disc.deallocateMemoryBlocks(f.getAllocatedBlocks());
 								textarea.appendText("File deleted and memory deallocated.\n");
 								break;
 							}
 						}
 					} else if (userInput.split(" ")[0].equals("dir") || userInput.split(" ")[0].equals("ls")) {
+						textarea.appendText("-----------\n");
+
 						textarea.appendText("Subdirectories:\n");
 						for (Directory subdir : currentDirectory.getSubdirectories()) {
 							textarea.appendText(subdir.getName() + "\n");
 						}
+
 						textarea.appendText("-----------\n");
 
 						textarea.appendText("Files:\n");
+
 						for (File file : currentDirectory.getFiles()) {
 							textarea.appendText(file.getName() + "\n");
 						}
@@ -207,14 +219,18 @@ public class Main extends Application {
 								segment.setProcess(p);
 							}
 
+							textarea.appendText("-----------\n");
+
 							if (allocatedSegments.size() > 0) {
 								scheduler.addProcess(p);
 
 								textarea.appendText("process " + p.getName() + ", " + p.getState() + ", time: "
-										+ p.getExecutionTime() + "\n");
+										+ p.getExecutionTime() + "s\n");
 							} else {
 								textarea.appendText("Not enough memory for process.\n");
 							}
+
+							textarea.appendText("-----------\n");
 						} else {
 							System.out.println("Not enough available memory segments to allocate for the process.");
 						}
@@ -231,27 +247,33 @@ public class Main extends Application {
 					} else if (userInput.equals("ps")) {
 						List<Process> processesInQueue = scheduler.getProcessesInQueue();
 
+						textarea.appendText("-----------\n");
+
 						for (Process process : processesInQueue) {
 							textarea.appendText("Process " + process.getName() + " in state: " + process.getState()
-									+ ", " + process.getExecutionTime() + "\n");
+									+ ", " + process.getExecutionTime() + "s\n");
 						}
 
 						Process currentProcess = scheduler.getCurrentRunningProcess();
 
 						if (currentProcess != null) {
 							textarea.appendText("Process " + currentProcess.getName() + " in state: "
-									+ currentProcess.getState() + ", " + currentProcess.getExecutionTime() + "\n");
+									+ currentProcess.getState() + ", " + currentProcess.getExecutionTime() + "s\n");
 						}
 
 						List<Process> processesFinished = scheduler.getCompletedProcesses();
 
 						for (Process process : processesFinished) {
 							textarea.appendText("Process " + process.getName() + " in state: " + process.getState()
-									+ ", " + process.getExecutionTime() + "\n");
+									+ ", " + process.getExecutionTime() + "s\n");
 						}
+
+						textarea.appendText("-----------\n");
 					} else if (!userInput.equals("")) {
 						textarea.appendText("Unknown command.\n");
 					}
+
+					textarea.appendText("-----------\n");
 				}
 
 				if (!userInput.equals("")) {
@@ -264,59 +286,6 @@ public class Main extends Application {
 
 		} catch (Exception e) {
 			e.printStackTrace();
-		}
-	}
-
-	private List<Block> allocateMemoryBlocks(int fileSizeInMB) {
-		List<Block> allocatedBlocks = new ArrayList<>();
-		int blocksRequired = (int) Math.ceil((double) fileSizeInMB / blockSizeInMB);
-
-		int contiguousCount = 0;
-
-		for (Block block : diskMemoryBlocks) {
-			if (!block.isAllocated()) {
-				contiguousCount++;
-				allocatedBlocks.add(block);
-
-				if (contiguousCount == blocksRequired) {
-					for (Block allocatedBlock : allocatedBlocks) {
-						allocatedBlock.allocate();
-					}
-
-					return allocatedBlocks;
-				}
-			} else {
-				contiguousCount = 0;
-				allocatedBlocks.clear();
-			}
-		}
-
-		for (Block block : allocatedBlocks) {
-			block.deallocate();
-		}
-
-		return null;
-	}
-
-	private int getAvailableMemorySize() {
-		int availableMemory = 0;
-		for (Block block : diskMemoryBlocks) {
-			if (!block.isAllocated()) {
-				availableMemory += blockSizeInMB;
-			}
-		}
-		return availableMemory;
-	}
-
-	private void deallocateMemoryBlocks(List<Block> blocksToDeallocate) {
-		for (Block block : blocksToDeallocate) {
-			block.deallocate();
-		}
-	}
-
-	private static void createMemoryBlocks() {
-		for (int i = 0; i < TOTAL_DISK_MEMORY_BLOCKS; i++) {
-			diskMemoryBlocks.add(new Block(blockSizeInMB));
 		}
 	}
 }

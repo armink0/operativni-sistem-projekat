@@ -44,7 +44,7 @@ public class FCFSScheduler {
 					}
 				}
 
-				System.out.println(currentProcess.getName() + "DONZO");
+				System.out.println(currentProcess.getName() + " DONE");
 
 				completedProcesses.add(currentProcess);
 				currentRunningProcess = null;

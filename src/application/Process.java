@@ -7,14 +7,14 @@ public class Process {
 	private State state;
 
 	public enum State {
-		WAITING, RUNNING, DONE
+		READY, RUNNING, DONE
 	}
 
 	public Process(String name, int executionTime, int memoryRequirement) {
 		this.name = name;
 		this.executionTime = executionTime;
 		this.memoryRequirement = memoryRequirement;
-		this.state = State.WAITING;
+		this.state = State.READY;
 	}
 
 	public String getName() {
